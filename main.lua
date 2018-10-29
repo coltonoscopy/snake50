@@ -14,8 +14,11 @@ TILE_APPLE = 3
 SNAKE_SPEED = 0.1
 
 local largeFont = love.graphics.newFont(32)
+local hugeFont = love.graphics.newFont(128)
 
 local score = 0
+local gameOver = false
+local gameStart = true
 
 local tileGrid = {}
 
@@ -40,6 +43,7 @@ function love.load()
     math.randomseed(os.time())
 
     initializeGrid()
+    initializeSnake()
 
     tileGrid[snakeTiles[1][2]][snakeTiles[1][1]] = TILE_SNAKE_HEAD
 end
@@ -49,85 +53,128 @@ function love.keypressed(key)
         love.event.quit()
     end
 
-    if key == 'left' then
-        snakeMoving = 'left'
-    elseif key == 'right' then
-        snakeMoving = 'right'
-    elseif key == 'up' then
-        snakeMoving = 'up'
-    elseif key == 'down' then
-        snakeMoving = 'down'
+    if not gameOver then
+        if key == 'left' and snakeMoving ~= 'right' then
+            snakeMoving = 'left'
+        elseif key == 'right' and snakeMoving ~= 'left' then
+            snakeMoving = 'right'
+        elseif key == 'up' and snakeMoving ~= 'down' then
+            snakeMoving = 'up'
+        elseif key == 'down' and snakeMoving ~= 'up' then
+            snakeMoving = 'down'
+        end
+    end
+
+    if gameOver or gameStart then
+        if key == 'enter' or key == 'return' then
+            initializeGrid()
+            initializeSnake()
+            score = 0
+            gameOver = false
+            gameStart = false
+        end
     end
 end
 
 function love.update(dt)
-    snakeTimer = snakeTimer + dt
+    if not gameOver then
+        snakeTimer = snakeTimer + dt
 
-    local priorHeadX, priorHeadY = snakeX, snakeY
+        local priorHeadX, priorHeadY = snakeX, snakeY
 
-    if snakeTimer >= SNAKE_SPEED then
-        if snakeMoving == 'up' then
-            if snakeY <= 1 then
-                snakeY = MAX_TILES_Y
+        if snakeTimer >= SNAKE_SPEED then
+            if snakeMoving == 'up' then
+                if snakeY <= 1 then
+                    snakeY = MAX_TILES_Y
+                else
+                    snakeY = snakeY - 1
+                end
+            elseif snakeMoving == 'down' then
+                if snakeY >= MAX_TILES_Y then
+                    snakeY = 1
+                else
+                    snakeY = snakeY + 1
+                end
+            elseif snakeMoving == 'left' then
+                if snakeX <= 1 then
+                    snakeX = MAX_TILES_X
+                else
+                    snakeX = snakeX - 1
+                end
             else
-                snakeY = snakeY - 1
+                if snakeX >= MAX_TILES_X then
+                    snakeX = 1
+                else
+                    snakeX = snakeX + 1
+                end
             end
-        elseif snakeMoving == 'down' then
-            if snakeY >= MAX_TILES_Y then
-                snakeY = 1
-            else
-                snakeY = snakeY + 1
-            end
-        elseif snakeMoving == 'left' then
-            if snakeX <= 1 then
-                snakeX = MAX_TILES_X
-            else
-                snakeX = snakeX - 1
-            end
-        else
-            if snakeX >= MAX_TILES_X then
-                snakeX = 1
-            else
-                snakeX = snakeX + 1
-            end
-        end
 
-        -- check for apple and add to score
-        if tileGrid[snakeY][snakeX] == TILE_APPLE then
-            score = score + 1
-
-            local newAppleX, newAppleY = math.random(MAX_TILES_X), math.random(MAX_TILES_Y)
-
-            tileGrid[newAppleY][newAppleX] = TILE_APPLE
-
-            -- add to head if greater than 1 segment
+            -- push a new head element onto the snake data structure
             table.insert(snakeTiles, 1, {snakeX, snakeY})
-            tileGrid[snakeY][snakeX] = TILE_SNAKE_HEAD
-            tileGrid[priorHeadY][priorHeadX] = TILE_SNAKE_BODY
-        end
-        
-        -- update the head location
-        tileGrid[snakeY][snakeX] = TILE_SNAKE_HEAD
-        
-        if #snakeTiles > 1 then
-            local tail = snakeTiles[#snakeTiles]
-            tileGrid[tail[2]][tail[1]] = TILE_EMPTY
-            tileGrid[priorHeadY][priorHeadX] = TILE_SNAKE_BODY
-            table.insert(snakeTiles, 1, {snakeY, snakeX})
-        else
-            tileGrid[priorHeadY][priorHeadX] = TILE_EMPTY
-        end
 
-        snakeTimer = 0
+            if tileGrid[snakeY][snakeX] == TILE_SNAKE_BODY then
+
+                gameOver = true
+
+            -- if we are eating an apple
+            elseif tileGrid[snakeY][snakeX] == TILE_APPLE then
+
+                -- increase score and generate new apple
+                score = score + 1
+                local appleX, appleY = math.random(MAX_TILES_X), math.random(MAX_TILES_Y)
+                tileGrid[appleY][appleX] = TILE_APPLE
+            
+            -- otherwise, pop the tail and erase from the grid
+            else
+
+                local tail = snakeTiles[#snakeTiles]
+                tileGrid[tail[2]][tail[1]] = TILE_EMPTY
+                table.remove(snakeTiles)
+
+            end
+
+            -- if our snake is greater than one tile long
+            if #snakeTiles > 1 then
+
+                -- set the prior head value to a body value
+                tileGrid[priorHeadY][priorHeadX] = TILE_SNAKE_BODY
+            end
+
+            -- update the view with the next snake head location
+            tileGrid[snakeY][snakeX] = TILE_SNAKE_HEAD
+
+            snakeTimer = 0
+        end
     end
 end
 
 function love.draw()
-    drawGrid()
-    -- drawSnake()
 
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print('Score: ' .. tostring(score), 10, 10)
+    if gameStart then
+        love.graphics.setFont(hugeFont)
+        love.graphics.printf("SNAKE", 0, WINDOW_HEIGHT / 2 - 64, WINDOW_WIDTH, 'center')
+
+        love.graphics.setFont(largeFont)
+        love.graphics.printf('Press Enter to Start', 0, WINDOW_HEIGHT / 2 + 96, WINDOW_WIDTH, 'center')
+    else
+        drawGrid()
+        
+        -- print score
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.print('Score: ' .. tostring(score), 10, 10)
+
+        if gameOver then
+            drawGameOver()
+        end
+    end
+end
+
+function drawGameOver()
+    love.graphics.setFont(hugeFont)
+    love.graphics.printf('GAME OVER', 0, WINDOW_HEIGHT / 2 - 64, WINDOW_WIDTH, 'center')
+
+    love.graphics.setFont(largeFont)
+    love.graphics.printf('Press Enter to Restart', 0, WINDOW_HEIGHT / 2 + 96, WINDOW_WIDTH, 'center')
 end
 
 function drawGrid()
@@ -165,13 +212,17 @@ function drawGrid()
     end
 end
 
-function drawSnake()
-    love.graphics.setColor(0, 1, 0, 1)
-    love.graphics.rectangle('fill', (snakeX - 1) * TILE_SIZE, (snakeY - 1) * TILE_SIZE, 
-        TILE_SIZE, TILE_SIZE)
+function initializeSnake()
+    snakeX, snakeY = 1, 1
+    snakeMoving = 'right'
+    snakeTiles = {
+        {snakeX, snakeY}
+    }
 end
 
 function initializeGrid()
+    tileGrid = {}
+
     for y = 1, MAX_TILES_Y do
 
         table.insert(tileGrid, {})
