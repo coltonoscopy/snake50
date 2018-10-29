@@ -21,11 +21,15 @@ local hugeFont = love.graphics.newFont(128)
 
 local appleSound = love.audio.newSource('apple.wav', 'static')
 local newLevelSound = love.audio.newSource('newlevel.wav', 'static')
+local musicSound = love.audio.newSource('music.mp3', 'static')
+local deathSound = love.audio.newSource('death.wav', 'static')
+local gameOverSound = love.audio.newSource('gameover.wav', 'static')
 
 local score = 0
 local gameOver = false
 local gameStart = true
 local newLevel = true
+local lives = 3
 
 local tileGrid = {}
 
@@ -48,6 +52,9 @@ function love.load()
     })
 
     math.randomseed(os.time())
+
+    musicSound:setLooping(true)
+    musicSound:play()
 
     initializeGrid()
     initializeSnake()
@@ -83,6 +90,7 @@ function love.keypressed(key)
             initializeGrid()
             initializeSnake()
             score = 0
+            lives = 3
             gameOver = false
             gameStart = false
         end
@@ -128,7 +136,17 @@ function love.update(dt)
             if tileGrid[snakeY][snakeX] == TILE_SNAKE_BODY or
                 tileGrid[snakeY][snakeX] == TILE_STONE then
 
-                gameOver = true
+                lives = lives - 1
+
+                if lives > 0 then
+                    newLevel = true
+                    clearSnake()
+                    initializeSnake()
+                    deathSound:play()
+                else
+                    gameOver = true
+                    gameOverSound:play()
+                end
 
             -- if we are eating an apple
             elseif tileGrid[snakeY][snakeX] == TILE_APPLE then
@@ -162,7 +180,7 @@ function love.update(dt)
 
             end
 
-            if not gameOver then
+            if not gameOver and not newLevel then
                 -- if our snake is greater than one tile long
                 if #snakeTiles > 1 then
 
@@ -193,9 +211,8 @@ function love.draw()
         -- print score
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.print('Score: ' .. tostring(score), 10, 10)
-
-        love.graphics.setColor(1, 1, 1, 1)
         love.graphics.printf('Level: ' .. tostring(level), -10, 10, WINDOW_WIDTH, 'right')
+        love.graphics.printf('Lives: ' .. tostring(lives), 0, 10, WINDOW_WIDTH, 'center')
 
         if newLevel then
             love.graphics.setFont(hugeFont)
@@ -267,6 +284,12 @@ function generateObstacle(obstacle)
     until tileGrid[obstacleY][obstacleX] == TILE_EMPTY
 
     tileGrid[obstacleY][obstacleX] = obstacle
+end
+
+function clearSnake()
+    for k, elem in pairs(snakeTiles) do
+        if k > 1 then tileGrid[elem[2]][elem[1]] = TILE_EMPTY end
+    end
 end
 
 function initializeSnake()
