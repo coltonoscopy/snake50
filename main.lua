@@ -19,6 +19,9 @@ SNAKE_SPEED = math.max(0.01, 0.11 - (level * 0.01))
 local largeFont = love.graphics.newFont(32)
 local hugeFont = love.graphics.newFont(128)
 
+local appleSound = love.audio.newSource('apple.wav', 'static')
+local newLevelSound = love.audio.newSource('newlevel.wav', 'static')
+
 local score = 0
 local gameOver = false
 local gameStart = true
@@ -133,10 +136,14 @@ function love.update(dt)
                 -- increase score and generate new apple
                 score = score + 1
 
+                -- play sound effect
+                appleSound:play()
+
                 if score > level * math.ceil(level / 2) * 3 then
                     level = level + 1
                     SNAKE_SPEED = math.max(0.01, 0.11 - (level * 0.01))
                     newLevel = true
+                    newLevelSound:play()
 
                     initializeGrid()
                     initializeSnake()
